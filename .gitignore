@@ -1,0 +1,7 @@
+#ignore terraform to avoid downloader binaries into the root folder
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfvars
+*.tfplan
+.crash/
