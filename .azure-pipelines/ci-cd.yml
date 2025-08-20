@@ -1,0 +1,52 @@
+trigger:
+  branches:
+    include:
+      - main
+
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildAndPush
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: Docker@2
+            inputs:
+              command: buildAndPush
+              repository: devopsacrdemo123.azurecr.io/devopsapp
+              dockerfile: app/Dockerfile
+              tags: |
+                $(Build.SourceBranchName)
+
+  - stage: DeployToStaging
+    dependsOn: Build
+    jobs:
+      - job: HelmDeployStaging
+        steps:
+          - task: HelmInstaller@1
+          - script: |
+              helm upgrade --install devopsapp-staging ./helm/myapp \
+                -f ./helm/myapp/values.staging.yaml \
+                --namespace staging
+            displayName: 'Deploy to Staging'
+
+  - stage: Approve
+    dependsOn: DeployToStaging
+    jobs:
+      - job: ManualApproval
+        steps:
+          - task: ManualValidation@0
+            inputs:
+              instructions: 'Approve to deploy to production'
+              approvers: user1@company.com,user2@company.com
+
+  - stage: DeployToProduction
+    dependsOn: Approve
+    condition: and(succeeded(), contains(variables['Build.SourceBranch'], 'refs/tags/v'))
+    jobs:
+      - job: HelmDeployProduction
+        steps:
+          - script: |
+              helm upgrade --install devopsapp-prod ./helm/myapp \
+                -f ./helm/myapp/values-production.yaml \
+                --namespace production
